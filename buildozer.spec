@@ -1,8 +1,7 @@
-
 [app]
 
 # (str) Title of your application
-title = Wildlife Audio
+title = Wildlife Studio
 
 # (str) Package name
 package.name = wildlifeaudio
@@ -16,14 +15,14 @@ source.dir = .
 # (list) Source files to include (let empty to include all the files)
 source.include_exts = py,png,jpg,kv,atlas,mp3,wav
 
-# (str) Application versioning (method 1)
-version = 0.1
+# (str) Application versioning
+version = 1.0
 
 # (list) Application requirements
-# comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy,kivymd,ffpyplayer,pillow,android
+# CRITICAL: Added 'ffmpeg' so the audio engine works!
+requirements = python3,kivy,kivymd,pillow,android,ffmpeg
 
-# (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
+# (str) Supported orientation
 orientation = portrait
 
 # (bool) Indicate if the application should be fullscreen or not
@@ -34,8 +33,7 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE
 
 # --- ANDROID CONFIGURATION ---
 
-# (int) Target Android API
-# We use 33 (Android 13) because it is STABLE. 34 causes errors.
+# (int) Target Android API (Stable)
 android.api = 33
 
 # (int) Minimum API your APK will support
