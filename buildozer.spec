@@ -20,6 +20,7 @@ source.include_exts = py,png,jpg,kv,atlas,mp3,wav
 version = 0.1
 
 # (list) Application requirements
+# comma separated e.g. requirements = sqlite3,kivy
 requirements = python3,kivy,kivymd,ffpyplayer,pillow,android
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
@@ -34,7 +35,8 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE
 # --- ANDROID CONFIGURATION ---
 
 # (int) Target Android API
-android.api = 34
+# We use 33 (Android 13) because it is STABLE. 34 causes errors.
+android.api = 33
 
 # (int) Minimum API your APK will support
 android.minapi = 21
@@ -42,7 +44,7 @@ android.minapi = 21
 # (int) Android NDK version to use
 android.ndk = 25b
 
-# (bool) skip_update MUST BE 0 (False) on GitHub Actions so it downloads the tools!
+# (bool) skip_update MUST be 0 (False) for GitHub to work
 android.skip_update = 0
 
 # (bool) Accept license automatically
