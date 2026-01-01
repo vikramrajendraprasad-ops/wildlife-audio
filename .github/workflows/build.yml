@@ -1,3 +1,4 @@
+
 name: CI
 on:
   push:
@@ -5,13 +6,19 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # WE CHANGED THIS: Force Ubuntu 22.04 (Stable for Android NDK)
+    runs-on: ubuntu-22.04
 
     steps:
-      # Updated to v4 (Latest)
       - uses: actions/checkout@v4
 
-      # Updated to v5 (Latest)
+      # Setup Java 17 (Required for Android builds)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -29,14 +36,14 @@ jobs:
             libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev \
             libswscale-dev libavformat-dev libavcodec-dev \
             zlib1g-dev libgstreamer1.0 \
-            gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+            libffi-dev libssl-dev autoconf libtool
 
       - name: Build APK
         run: |
           # We use 'yes' to automatically accept the SDK license
           yes | buildozer android debug
 
-      # THE FIX IS HERE: Updated from v2 to v4
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
