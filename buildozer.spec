@@ -1,7 +1,8 @@
+
 [app]
 
 # (str) Title of your application
-title = Wildlife Studio
+title = Wildlife Pro
 
 # (str) Package name
 package.name = wildlifeaudio
@@ -13,13 +14,13 @@ package.domain = org.wildlife
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas,mp3,wav
+# IMPORTANT: We added ',so' here so your engine file gets included!
+source.include_exts = py,png,jpg,kv,atlas,mp3,wav,so
 
 # (str) Application versioning
 version = 1.0
 
 # (list) Application requirements
-# CRITICAL: Added 'ffmpeg' so the audio engine works!
 requirements = python3,kivy,kivymd,pillow,android,ffmpeg
 
 # (str) Supported orientation
@@ -33,7 +34,7 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE
 
 # --- ANDROID CONFIGURATION ---
 
-# (int) Target Android API (Stable)
+# (int) Target Android API (Stable 33)
 android.api = 33
 
 # (int) Minimum API your APK will support
