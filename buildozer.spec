@@ -1,3 +1,4 @@
+
 [app]
 
 # (str) Title of your application
@@ -15,9 +16,8 @@ source.dir = .
 # (list) Source files to include (let empty to include all the files)
 source.include_exts = py,png,jpg,kv,atlas,mp3,wav
 
-# --- THE MISSING LINE WAS HERE ---
+# (str) Application versioning (method 1)
 version = 0.1
-# ---------------------------------
 
 # (list) Application requirements
 requirements = python3,kivy,kivymd,ffpyplayer,pillow,android
@@ -31,8 +31,10 @@ fullscreen = 0
 # (list) Permissions
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE_LOCK
 
+# --- ANDROID CONFIGURATION ---
+
 # (int) Target Android API
-android.api = 33
+android.api = 34
 
 # (int) Minimum API your APK will support
 android.minapi = 21
@@ -40,8 +42,8 @@ android.minapi = 21
 # (int) Android NDK version to use
 android.ndk = 25b
 
-# (bool) Skip updates to avoid the loop
-android.skip_update = 1
+# (bool) skip_update MUST BE 0 (False) on GitHub Actions so it downloads the tools!
+android.skip_update = 0
 
 # (bool) Accept license automatically
 android.accept_sdk_license = True
