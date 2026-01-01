@@ -1,4 +1,3 @@
-
 name: CI
 on:
   push:
@@ -6,7 +5,6 @@ on:
 
 jobs:
   build:
-    # WE CHANGED THIS: Force Ubuntu 22.04 (Stable for Android NDK)
     runs-on: ubuntu-22.04
 
     steps:
@@ -27,21 +25,18 @@ jobs:
       - name: Install Buildozer
         run: pip install buildozer cython==0.29.33
 
+      # FIXED: Using the official Buildozer dependency list for Ubuntu 22.04
       - name: Install Linux Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential git python3 \
-            python3-dev ffmpeg libsdl2-dev libsdl2-image-dev \
-            libsdl2-mixer-dev libsdl2-ttf-dev libportmidi-dev \
-            libswscale-dev libavformat-dev libavcodec-dev \
-            zlib1g-dev libgstreamer1.0 \
-            gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-            libffi-dev libssl-dev autoconf libtool
+            build-essential git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev \
+            libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev \
+            libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev
 
       - name: Build APK
         run: |
-          # We use 'yes' to automatically accept the SDK license
           yes | buildozer android debug
 
       - name: Upload artifacts
