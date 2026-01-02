@@ -63,28 +63,41 @@ class WildlifeStudio(MDApp):
 
     def permission_callback(self, permissions, results):
         if all(results):
-            self.status_btn.text = "Permissions Granted"
+            self.status_btn.text = "Locating Engine..."
             self.find_system_engine()
         else:
             self.status_btn.text = "Permission Denied"
 
     def find_system_engine(self):
-        # We look for the engine in the NATIVE LIBRARY path (The only executable place)
-        try:
-            # Standard path for Android Native Libraries
-            lib_path = os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so')
+        # DIRECT TARGETING (No guessing)
+        # Based on your package name: org.wildlife.wildlifeaudio
+        
+        possible_paths = [
+            # 1. The Standard Internal Storage Path (95% of phones)
+            "/data/data/org.wildlife.wildlifeaudio/lib/libffmpeg_engine.so",
             
-            if os.path.exists(lib_path):
-                self.ffmpeg_path = lib_path
-                self.status_btn.text = "Engine Ready (System Mode)"
-                self.load_files()
-            else:
-                self.status_btn.text = "Engine Not Found in Libs!"
-                self.show_error(f"Could not find: {lib_path}\nDid you use android.add_libs_arm64?")
-                
-        except Exception as e:
-            self.status_btn.text = "Engine Error"
-            self.show_error(str(e))
+            # 2. The Multi-User Path (Samsung/Newer phones)
+            "/data/user/0/org.wildlife.wildlifeaudio/lib/libffmpeg_engine.so",
+            
+            # 3. Fallback: Check System Path Variable
+            os.path.join(os.environ.get("LD_LIBRARY_PATH", ""), "libffmpeg_engine.so")
+        ]
+
+        found_path = None
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                found_path = path
+                break
+        
+        if found_path:
+            self.ffmpeg_path = found_path
+            self.status_btn.text = "Engine Ready!"
+            self.load_files()
+        else:
+            # If this happens, it means the file was NOT packed into the APK.
+            self.status_btn.text = "Install Failed"
+            self.show_error(f"Engine file missing.\nChecked: {possible_paths[0]}\n\nDid you upload 'libffmpeg_engine.so' to GitHub?")
 
     def load_files(self):
         self.list_view.clear_widgets()
@@ -155,8 +168,7 @@ class WildlifeStudio(MDApp):
                 fc = "surround=delay=20,headphone=ir=builtin"
                 cmd = [self.ffmpeg_path, '-y', '-i', input_path, '-af', fc, out]
             
-            # --- CRITICAL CHANGE ---
-            # We run the command and WAIT for output, catching errors safely
+            # --- EXECUTION ---
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
 
@@ -164,6 +176,7 @@ class WildlifeStudio(MDApp):
                 Clock.schedule_once(lambda x: self.success(os.path.basename(out)))
             else:
                 err = stderr.decode('utf-8')
+                if not err: err = "Process Failed (Code != 0)"
                 Clock.schedule_once(lambda x: self.show_error(err[-300:]))
 
         except Exception as e:
