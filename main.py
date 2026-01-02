@@ -64,21 +64,30 @@ class WildlifeStudio(MDApp):
 
     def permission_callback(self, permissions, results):
         if all(results):
-            self.status_btn.text = "Locating Engine..."
+            # Use Clock to ensure UI updates happen on the main thread (prevents crash)
+            Clock.schedule_once(lambda x: self.update_status("Locating Engine..."))
             threading.Thread(target=self.install_engine).start()
         else:
-            self.status_btn.text = "Permission Denied"
+            self.update_status("Permission Denied")
+
+    def update_status(self, text):
+        self.status_btn.text = text
 
     def install_engine(self):
         # --- THE UNIVERSAL HUNTER LOGIC ---
+        
         app_folder = os.path.dirname(os.path.abspath(__file__))
-        files_dir = os.environ.get('ANDROID_PRIVATE', app_folder)
+        
+        # FIX: Use 'user_data_dir' which is guaranteed writable
+        files_dir = self.user_data_dir
         dest = os.path.join(files_dir, 'ffmpeg_run') 
 
-        # Check BOTH locations (Assets and Libs)
+        # Search locations
         possible_locations = [
             os.path.join(app_folder, 'libffmpeg_engine.so'),
             os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so'),
+            # Fallback for some devices
+            os.path.join(app_folder, '../lib/libffmpeg_engine.so')
         ]
 
         found_source = None
@@ -89,21 +98,23 @@ class WildlifeStudio(MDApp):
         
         if found_source:
             try:
+                # Copy to safe folder
                 shutil.copy2(found_source, dest)
+                # Make executable
                 os.chmod(dest, 0o755) 
                 self.ffmpeg_path = dest
                 Clock.schedule_once(lambda x: self.engine_ready(True))
             except Exception as e:
                 Clock.schedule_once(lambda x: self.engine_ready(False, str(e)))
         else:
-            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file missing (Check GitHub Upload)"))
+            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file not found inside APK."))
 
     def engine_ready(self, success, message=""):
         if success:
             self.status_btn.text = "Engine Ready!"
             self.load_files()
         else:
-            self.status_btn.text = "Engine Missing"
+            self.status_btn.text = "Engine Error"
             self.show_error(message)
 
     def get_storage_path(self):
