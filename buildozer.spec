@@ -14,14 +14,13 @@ package.domain = org.wildlife
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-# CRITICAL FIX 1: Added ',so' to include your manual engine file
-source.include_exts = py,png,jpg,kv,atlas,mp3,wav,so
+# CHANGE 1: Removed ',so' from here (It goes in libs now)
+source.include_exts = py,png,jpg,kv,atlas,mp3,wav
 
 # (str) Application versioning
 version = 1.0
 
 # (list) Application requirements
-# CRITICAL FIX 2: REMOVED 'ffmpeg' to stop the crash!
 requirements = python3,kivy,kivymd,pillow,android
 
 # (str) Supported orientation
@@ -35,7 +34,7 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE
 
 # --- ANDROID CONFIGURATION ---
 
-# (int) Target Android API (Stable)
+# (int) Target Android API
 android.api = 33
 
 # (int) Minimum API your APK will support
@@ -55,6 +54,10 @@ android.archs = arm64-v8a
 
 # (bool) enables Android auto backup
 android.allow_backup = True
+
+# CHANGE 2: THE MAGIC LINE
+# This forces the engine into the "Safe Execution Zone"
+android.add_libs_arm64 = libffmpeg_engine.so
 
 [buildozer]
 
