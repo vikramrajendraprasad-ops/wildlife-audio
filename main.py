@@ -2,7 +2,6 @@
 import os
 import threading
 import subprocess
-import time
 from kivymd.app import MDApp
 from kivymd.uix.screen import MDScreen
 from kivymd.uix.list import MDList, OneLineIconListItem, IconLeftWidget
@@ -28,7 +27,7 @@ class WildlifeStudio(MDApp):
         layout = MDBoxLayout(orientation='vertical')
         
         toolbar = MDTopAppBar(title="Wildlife Pro Studio")
-        toolbar.right_action_items = [["refresh", lambda x: self.safe_load_files()]]
+        toolbar.right_action_items = [["refresh", lambda x: self.load_files()]]
         layout.add_widget(toolbar)
 
         scroll = MDScrollView()
@@ -36,7 +35,6 @@ class WildlifeStudio(MDApp):
         scroll.add_widget(self.list_view)
         layout.add_widget(scroll)
         
-        # STATUS BUTTON
         self.status_btn = MDFillRoundFlatButton(
             text="Initialize Engine",
             pos_hint={"center_x": 0.5},
@@ -51,107 +49,53 @@ class WildlifeStudio(MDApp):
         if platform == 'android':
             self.check_permissions()
         else:
-            self.safe_load_files()
+            self.load_files()
 
     def check_permissions(self, *args):
-        try:
-            if platform == 'android':
-                from android.permissions import request_permissions, Permission
-                request_permissions(
-                    [Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE],
-                    self.permission_callback
-                )
-            else:
-                self.safe_load_files()
-        except Exception as e:
-            self.update_status(f"Perm Error: {str(e)}")
+        if platform == 'android':
+            from android.permissions import request_permissions, Permission
+            request_permissions(
+                [Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE],
+                self.permission_callback
+            )
+        else:
+            self.load_files()
 
     def permission_callback(self, permissions, results):
         if all(results):
-            self.update_status("Permissions Granted. Waiting...")
-            # CRITICAL FIX: Wait 1.5 seconds before touching files to prevent crash
-            Clock.schedule_once(lambda dt: self.start_install_thread(), 1.5)
+            self.status_btn.text = "Permissions Granted"
+            self.find_system_engine()
         else:
-            self.update_status("Permission Denied")
+            self.status_btn.text = "Permission Denied"
 
-    def start_install_thread(self):
-        threading.Thread(target=self.install_engine).start()
-
-    def update_status(self, text):
-        self.status_btn.text = str(text)
-
-    def install_engine(self):
+    def find_system_engine(self):
+        # We look for the engine in the NATIVE LIBRARY path (The only executable place)
         try:
-            # --- SAFER COPY METHOD ---
-            app_folder = os.path.dirname(os.path.abspath(__file__))
-            files_dir = self.user_data_dir
-            dest = os.path.join(files_dir, 'ffmpeg_run') 
-
-            # Locations to hunt for the file
-            possible_locations = [
-                os.path.join(app_folder, 'libffmpeg_engine.so'),
-                os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so'),
-                os.path.join(app_folder, '../lib/libffmpeg_engine.so')
-            ]
-
-            found_source = None
-            for path in possible_locations:
-                if os.path.exists(path):
-                    found_source = path
-                    break
+            # Standard path for Android Native Libraries
+            lib_path = os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so')
             
-            if found_source:
-                # Manual Read/Write Buffer Copy (Crash-Proof)
-                try:
-                    with open(found_source, 'rb') as f_in:
-                        with open(dest, 'wb') as f_out:
-                            f_out.write(f_in.read())
-                    
-                    # Make Executable
-                    os.chmod(dest, 0o755) 
-                    self.ffmpeg_path = dest
-                    Clock.schedule_once(lambda x: self.engine_ready(True))
-                except Exception as e:
-                    Clock.schedule_once(lambda x: self.engine_ready(False, f"Copy Fail: {e}"))
+            if os.path.exists(lib_path):
+                self.ffmpeg_path = lib_path
+                self.status_btn.text = "Engine Ready (System Mode)"
+                self.load_files()
             else:
-                Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file not found."))
-        
+                self.status_btn.text = "Engine Not Found in Libs!"
+                self.show_error(f"Could not find: {lib_path}\nDid you use android.add_libs_arm64?")
+                
         except Exception as e:
-            Clock.schedule_once(lambda x: self.engine_ready(False, f"Install Error: {e}"))
-
-    def engine_ready(self, success, message=""):
-        if success:
-            self.status_btn.text = "Engine Ready!"
-            self.safe_load_files()
-        else:
             self.status_btn.text = "Engine Error"
-            self.show_error(message)
-
-    def get_storage_path(self):
-        if platform == 'android':
-            return "/storage/emulated/0/Download/Wildlife"
-        return "Wildlife_Test"
-
-    def safe_load_files(self):
-        # Wrapped in try-except to prevent crash if folder is busy
-        try:
-            self.load_files()
-        except Exception as e:
-            self.update_status(f"Scan Error: {str(e)}")
+            self.show_error(str(e))
 
     def load_files(self):
         self.list_view.clear_widgets()
-        path = self.get_storage_path()
-        
+        path = "/storage/emulated/0/Download/Wildlife"
         if not os.path.exists(path):
             try: os.makedirs(path)
             except: pass
             
         try:
             files = [f for f in os.listdir(path) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
-        except Exception as e:
-            self.status_btn.text = "Cannot read folder yet"
-            return
+        except: files = []
 
         if not files:
             self.status_btn.text = "No Audio Files in Download/Wildlife"
@@ -211,6 +155,8 @@ class WildlifeStudio(MDApp):
                 fc = "surround=delay=20,headphone=ir=builtin"
                 cmd = [self.ffmpeg_path, '-y', '-i', input_path, '-af', fc, out]
             
+            # --- CRITICAL CHANGE ---
+            # We run the command and WAIT for output, catching errors safely
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
 
@@ -226,7 +172,7 @@ class WildlifeStudio(MDApp):
     def success(self, filename):
         self.status_btn.text = f"Saved: {filename}"
         toast(f"Done! {filename}")
-        self.safe_load_files()
+        self.load_files()
 
     def show_error(self, error):
         self.status_btn.text = "Error!"
