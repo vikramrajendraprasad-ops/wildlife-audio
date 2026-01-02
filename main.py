@@ -1,4 +1,3 @@
-
 import os
 import shutil
 import threading
@@ -15,6 +14,7 @@ from kivymd.uix.menu import MDDropdownMenu
 from kivymd.toast import toast
 from kivy.utils import platform
 from kivy.clock import Clock
+from kivy.core.window import Window
 
 class WildlifeStudio(MDApp):
     dialog = None
@@ -55,39 +55,46 @@ class WildlifeStudio(MDApp):
     def check_permissions(self, *args):
         if platform == 'android':
             from android.permissions import request_permissions, Permission
-            request_permissions(
-                [Permission.READ_EXTERNAL_STORAGE, Permission.WRITE_EXTERNAL_STORAGE],
-                self.permission_callback
-            )
+            from android import api_version
+            
+            # ANDROID 13+ FIX (API 33)
+            # We must ask for READ_MEDIA_AUDIO, not READ_EXTERNAL_STORAGE
+            if api_version >= 33:
+                permissions = ['android.permission.READ_MEDIA_AUDIO']
+            else:
+                permissions = [Permission.READ_EXTERNAL_STORAGE]
+                
+            request_permissions(permissions, self.permission_callback)
         else:
             self.load_files()
 
     def permission_callback(self, permissions, results):
         if all(results):
-            # Use Clock to ensure UI updates happen on the main thread (prevents crash)
-            Clock.schedule_once(lambda x: self.update_status("Locating Engine..."))
+            self.update_status("Locating Engine...")
             threading.Thread(target=self.install_engine).start()
         else:
-            self.update_status("Permission Denied")
+            self.update_status("Permission Denied (Check Settings)")
+            toast("Please enable Audio permissions in Android Settings")
 
     def update_status(self, text):
-        self.status_btn.text = text
+        def _update(dt):
+            self.status_btn.text = text
+        Clock.schedule_once(_update)
 
     def install_engine(self):
-        # --- THE UNIVERSAL HUNTER LOGIC ---
-        
-        app_folder = os.path.dirname(os.path.abspath(__file__))
-        
-        # FIX: Use 'user_data_dir' which is guaranteed writable
+        # --- ROBUST ENGINE INSTALLER ---
         files_dir = self.user_data_dir
         dest = os.path.join(files_dir, 'ffmpeg_run') 
 
-        # Search locations
+        # We used 'android.add_libs_arm64_v8a' in buildozer.spec
+        # So the file IS at this specific system location:
+        native_lib_path = f'/data/data/{self.get_application_config().split("org.wildlife")[0]}org.wildlife.wildlifeaudio/lib/libffmpeg_engine.so'
+        
+        # Fallback search
         possible_locations = [
-            os.path.join(app_folder, 'libffmpeg_engine.so'),
-            os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so'),
-            # Fallback for some devices
-            os.path.join(app_folder, '../lib/libffmpeg_engine.so')
+            native_lib_path,
+            os.path.join(os.path.dirname(__file__), 'libffmpeg_engine.so'),
+            '/usr/lib/libffmpeg_engine.so' # For testing
         ]
 
         found_source = None
@@ -107,7 +114,7 @@ class WildlifeStudio(MDApp):
             except Exception as e:
                 Clock.schedule_once(lambda x: self.engine_ready(False, str(e)))
         else:
-            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file not found inside APK."))
+            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file missing. Rebuild APK."))
 
     def engine_ready(self, success, message=""):
         if success:
@@ -119,27 +126,46 @@ class WildlifeStudio(MDApp):
 
     def get_storage_path(self):
         if platform == 'android':
-            return "/storage/emulated/0/Download/Wildlife"
+            # Check if directory exists, if not create it
+            path = "/storage/emulated/0/Download/Wildlife"
+            if not os.path.exists(path):
+                try:
+                    os.makedirs(path)
+                except:
+                    pass
+            return path
         return "Wildlife_Test"
 
     def load_files(self):
-        self.list_view.clear_widgets()
-        path = self.get_storage_path()
-        if not os.path.exists(path):
-            try: os.makedirs(path)
-            except: pass
+        # CRASH FIX: Wrapped in Try/Except
+        try:
+            self.list_view.clear_widgets()
+            path = self.get_storage_path()
             
-        files = [f for f in os.listdir(path) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
-        
-        if not files:
-            self.status_btn.text = "No Audio Files in Download/Wildlife"
-            return
+            if not os.path.exists(path):
+                self.status_btn.text = "Folder Not Found"
+                return
 
-        for f in files:
-            full_path = os.path.join(path, f)
-            item = OneLineIconListItem(text=f, on_release=lambda x, p=full_path: self.open_menu(x, p))
-            item.add_widget(IconLeftWidget(icon="music"))
-            self.list_view.add_widget(item)
+            files = [f for f in os.listdir(path) if f.lower().endswith(('.mp3', '.wav', '.m4a'))]
+            
+            if not files:
+                self.status_btn.text = "No Audio in Download/Wildlife"
+                return
+
+            for f in files:
+                full_path = os.path.join(path, f)
+                item = OneLineIconListItem(text=f, on_release=lambda x, p=full_path: self.open_menu(x, p))
+                item.add_widget(IconLeftWidget(icon="music"))
+                self.list_view.add_widget(item)
+                
+        except PermissionError:
+            self.status_btn.text = "Storage Permission Error!"
+            self.show_error("Android blocked file access.
+1. Go to Settings > Apps > Wildlife Pro
+2. Permissions > Music and Audio > Allow")
+        except Exception as e:
+            self.status_btn.text = "File Load Error"
+            self.show_error(str(e))
 
     def open_menu(self, item, filepath):
         self.selected_file = filepath
@@ -210,7 +236,8 @@ class WildlifeStudio(MDApp):
     def success(self, filename):
         self.status_btn.text = f"Saved: {filename}"
         toast(f"Done! {filename}")
-        self.load_files()
+        # Refresh list safely
+        Clock.schedule_once(lambda x: self.load_files(), 1)
 
     def show_error(self, error):
         self.status_btn.text = "Error!"
