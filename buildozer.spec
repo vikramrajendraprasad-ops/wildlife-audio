@@ -14,14 +14,14 @@ package.domain = org.wildlife
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-# IMPORTANT: We added ',so' here so your engine file is baked inside!
+# CRITICAL FIX 1: Added ',so' to include your manual engine file
 source.include_exts = py,png,jpg,kv,atlas,mp3,wav,so
 
 # (str) Application versioning
 version = 1.0
 
 # (list) Application requirements
-# IMPORTANT: Removed 'ffmpeg' to stop the crash.
+# CRITICAL FIX 2: REMOVED 'ffmpeg' to stop the crash!
 requirements = python3,kivy,kivymd,pillow,android
 
 # (str) Supported orientation
@@ -35,7 +35,7 @@ android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE,WAKE
 
 # --- ANDROID CONFIGURATION ---
 
-# (int) Target Android API (Stable 33)
+# (int) Target Android API (Stable)
 android.api = 33
 
 # (int) Minimum API your APK will support
