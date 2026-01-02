@@ -14,14 +14,15 @@ package.domain = org.wildlife
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-# IMPORTANT: We added ',so' here so your engine file gets included!
+# IMPORTANT: We added ',so' here so your engine file is baked inside!
 source.include_exts = py,png,jpg,kv,atlas,mp3,wav,so
 
 # (str) Application versioning
 version = 1.0
 
 # (list) Application requirements
-requirements = python3,kivy,kivymd,pillow,android,ffmpeg
+# IMPORTANT: Removed 'ffmpeg' to stop the crash.
+requirements = python3,kivy,kivymd,pillow,android
 
 # (str) Supported orientation
 orientation = portrait
