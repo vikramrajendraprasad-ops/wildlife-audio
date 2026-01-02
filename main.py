@@ -1,5 +1,6 @@
 
 import os
+import glob
 import threading
 import subprocess
 from kivymd.app import MDApp
@@ -14,10 +15,11 @@ from kivymd.uix.menu import MDDropdownMenu
 from kivymd.toast import toast
 from kivy.utils import platform
 from kivy.clock import Clock
+from jnius import autoclass
 
 class WildlifeStudio(MDApp):
+    ffmpeg_path = "" 
     dialog = None
-    ffmpeg_path = "ffmpeg" 
     
     def build(self):
         self.theme_cls.primary_palette = "Green"
@@ -35,10 +37,11 @@ class WildlifeStudio(MDApp):
         scroll.add_widget(self.list_view)
         layout.add_widget(scroll)
         
+        # Hidden status button (only appears if there is a critical error)
         self.status_btn = MDFillRoundFlatButton(
-            text="Initialize Engine",
+            text="Loading...",
             pos_hint={"center_x": 0.5},
-            on_release=self.check_permissions
+            opacity=0 
         )
         layout.add_widget(MDBoxLayout(self.status_btn, padding=20, adaptive_height=True))
 
@@ -63,41 +66,45 @@ class WildlifeStudio(MDApp):
 
     def permission_callback(self, permissions, results):
         if all(results):
-            self.status_btn.text = "Locating Engine..."
-            self.find_system_engine()
+            # SILENTLY FIND THE ENGINE
+            self.find_engine_silent()
         else:
-            self.status_btn.text = "Permission Denied"
+            self.show_error("Permission Denied")
 
-    def find_system_engine(self):
-        # DIRECT TARGETING (No guessing)
-        # Based on your package name: org.wildlife.wildlifeaudio
-        
-        possible_paths = [
-            # 1. The Standard Internal Storage Path (95% of phones)
-            "/data/data/org.wildlife.wildlifeaudio/lib/libffmpeg_engine.so",
-            
-            # 2. The Multi-User Path (Samsung/Newer phones)
-            "/data/user/0/org.wildlife.wildlifeaudio/lib/libffmpeg_engine.so",
-            
-            # 3. Fallback: Check System Path Variable
-            os.path.join(os.environ.get("LD_LIBRARY_PATH", ""), "libffmpeg_engine.so")
-        ]
-
-        found_path = None
-        
-        for path in possible_paths:
+    def find_engine_silent(self):
+        # 1. Try Java (Best)
+        try:
+            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+            context = PythonActivity.mActivity.getApplicationContext()
+            path = context.getApplicationInfo().nativeLibraryDir + "/libffmpeg_engine.so"
             if os.path.exists(path):
-                found_path = path
-                break
-        
-        if found_path:
-            self.ffmpeg_path = found_path
-            self.status_btn.text = "Engine Ready!"
-            self.load_files()
-        else:
-            # If this happens, it means the file was NOT packed into the APK.
-            self.status_btn.text = "Install Failed"
-            self.show_error(f"Engine file missing.\nChecked: {possible_paths[0]}\n\nDid you upload 'libffmpeg_engine.so' to GitHub?")
+                self.ffmpeg_path = path
+                self.load_files()
+                return
+        except: pass
+
+        # 2. Try Wildcard (Fix for random letters)
+        try:
+            matches = glob.glob("/data/app/org.wildlife.wildlifeaudio*/lib/*/libffmpeg_engine.so")
+            if matches and os.path.exists(matches[0]):
+                self.ffmpeg_path = matches[0]
+                self.load_files()
+                return
+        except: pass
+
+        # 3. Try System Path (Fallback)
+        try:
+            path = os.path.join(os.environ.get("LD_LIBRARY_PATH", ""), "libffmpeg_engine.so")
+            if os.path.exists(path):
+                self.ffmpeg_path = path
+                self.load_files()
+                return
+        except: pass
+
+        # If we get here, it's missing
+        self.status_btn.opacity = 1
+        self.status_btn.text = "Error: Engine Missing"
+        self.show_error("Could not find libffmpeg_engine.so. Did you upload it?")
 
     def load_files(self):
         self.list_view.clear_widgets()
@@ -111,9 +118,12 @@ class WildlifeStudio(MDApp):
         except: files = []
 
         if not files:
-            self.status_btn.text = "No Audio Files in Download/Wildlife"
+            self.status_btn.opacity = 1
+            self.status_btn.text = "No Files in Download/Wildlife"
             return
 
+        # Restore UI
+        self.status_btn.opacity = 0
         for f in files:
             full_path = os.path.join(path, f)
             item = OneLineIconListItem(text=f, on_release=lambda x, p=full_path: self.open_menu(x, p))
@@ -135,14 +145,14 @@ class WildlifeStudio(MDApp):
 
     def process(self, preset):
         self.menu.dismiss()
-        self.status_btn.text = "Processing..."
+        toast("Processing... Please wait.")
         threading.Thread(target=self.run_ffmpeg, args=(self.selected_file, preset)).start()
 
     def run_ffmpeg(self, input_path, preset):
         try:
             base = os.path.splitext(input_path)[0]
             
-            # --- FORMULAS ---
+            # --- PROFESSIONAL AUDIO FORMULAS ---
             if preset == "wide_cinema":
                 out = f"{base}_Dolby.mp3"
                 fc = "stereotools=mlev=0.015625,aecho=0.8:0.9:1000:0.3,bass=g=3:f=100"
@@ -167,8 +177,7 @@ class WildlifeStudio(MDApp):
                 out = f"{base}_Binaural.wav"
                 fc = "surround=delay=20,headphone=ir=builtin"
                 cmd = [self.ffmpeg_path, '-y', '-i', input_path, '-af', fc, out]
-            
-            # --- EXECUTION ---
+
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
 
@@ -176,21 +185,18 @@ class WildlifeStudio(MDApp):
                 Clock.schedule_once(lambda x: self.success(os.path.basename(out)))
             else:
                 err = stderr.decode('utf-8')
-                if not err: err = "Process Failed (Code != 0)"
-                Clock.schedule_once(lambda x: self.show_error(err[-300:]))
+                Clock.schedule_once(lambda x: self.show_error(err))
 
         except Exception as e:
             Clock.schedule_once(lambda x: self.show_error(str(e)))
 
     def success(self, filename):
-        self.status_btn.text = f"Saved: {filename}"
-        toast(f"Done! {filename}")
+        toast(f"Success! Saved {filename}")
         self.load_files()
 
     def show_error(self, error):
-        self.status_btn.text = "Error!"
         if not self.dialog:
-            self.dialog = MDDialog(title="Log", text=str(error))
+            self.dialog = MDDialog(title="Error", text=str(error))
         self.dialog.text = str(error)
         self.dialog.open()
 
