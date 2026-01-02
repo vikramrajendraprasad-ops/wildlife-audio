@@ -70,13 +70,12 @@ class WildlifeStudio(MDApp):
             self.status_btn.text = "Permission Denied"
 
     def install_engine(self):
-        # --- THE UNIVERSAL HUNTER LOGIC (PROVEN TO WORK) ---
-        
+        # --- THE UNIVERSAL HUNTER LOGIC ---
         app_folder = os.path.dirname(os.path.abspath(__file__))
         files_dir = os.environ.get('ANDROID_PRIVATE', app_folder)
         dest = os.path.join(files_dir, 'ffmpeg_run') 
 
-        # We check BOTH places to be 100% safe
+        # Check BOTH locations (Assets and Libs)
         possible_locations = [
             os.path.join(app_folder, 'libffmpeg_engine.so'),
             os.path.join(os.environ.get('ANDROID_PRIVATE', ''), 'lib', 'libffmpeg_engine.so'),
@@ -97,7 +96,7 @@ class WildlifeStudio(MDApp):
             except Exception as e:
                 Clock.schedule_once(lambda x: self.engine_ready(False, str(e)))
         else:
-            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file not found (Unexpected)"))
+            Clock.schedule_once(lambda x: self.engine_ready(False, "Engine file missing (Check GitHub Upload)"))
 
     def engine_ready(self, success, message=""):
         if success:
@@ -153,6 +152,7 @@ class WildlifeStudio(MDApp):
         try:
             base = os.path.splitext(input_path)[0]
             
+            # --- FORMULAS ---
             if preset == "wide_cinema":
                 out = f"{base}_Dolby.mp3"
                 fc = "stereotools=mlev=0.015625,aecho=0.8:0.9:1000:0.3,bass=g=3:f=100"
@@ -182,6 +182,7 @@ class WildlifeStudio(MDApp):
                 out = f"{base}_Binaural.wav"
                 fc = "surround=delay=20,headphone=ir=builtin"
                 cmd = [self.ffmpeg_path, '-y', '-i', input_path, '-af', fc, out]
+            # ----------------
 
             process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = process.communicate()
